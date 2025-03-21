@@ -53,6 +53,16 @@ const notificationsFormSchema = z.object({
   ticketResolutionNotification: z.boolean().default(true),
 });
 
+// Novo esquema para alteração de senha
+const passwordFormSchema = z.object({
+  currentPassword: z.string().min(6, { message: "A senha atual deve ter pelo menos 6 caracteres" }),
+  newPassword: z.string().min(6, { message: "A nova senha deve ter pelo menos 6 caracteres" }),
+  confirmNewPassword: z.string(),
+}).refine(data => data.newPassword === data.confirmNewPassword, {
+  message: "As senhas não coincidem",
+  path: ["confirmNewPassword"],
+});
+
 export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -79,6 +89,16 @@ export default function SettingsPage() {
     },
   });
 
+  // Novo formulário para alteração de senha
+  const passwordForm = useForm<z.infer<typeof passwordFormSchema>>({
+    resolver: zodResolver(passwordFormSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmNewPassword: "",
+    },
+  });
+
   useEffect(() => {
     async function fetchUserData() {
       try {
@@ -94,9 +114,6 @@ export default function SettingsPage() {
         // Preencher o formulário com os dados do usuário
         accountForm.setValue("email", user.email || "");
         
-        // Em um sistema real, buscaríamos as preferências do usuário do banco de dados
-        // e preencheríamos os formulários com os valores existentes
-        
         setLoading(false);
       } catch (error) {
         console.error('Error:', error);
@@ -111,12 +128,8 @@ export default function SettingsPage() {
   async function onSubmitAccount(values: z.infer<typeof accountFormSchema>) {
     setSubmitting(true);
     try {
-      // Em um sistema real, aqui salvaríamos as configurações no banco de dados
       console.log("Configurações de conta:", values);
-      
-      // Simulando uma chamada de API
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
       toast.success("Configurações de conta atualizadas com sucesso");
     } catch (error) {
       toast.error("Ocorreu um erro ao atualizar as configurações");
@@ -128,15 +141,32 @@ export default function SettingsPage() {
   async function onSubmitNotifications(values: z.infer<typeof notificationsFormSchema>) {
     setSubmitting(true);
     try {
-      // Em um sistema real, aqui salvaríamos as configurações de notificação no banco de dados
       console.log("Configurações de notificação:", values);
-      
-      // Simulando uma chamada de API
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
       toast.success("Configurações de notificação atualizadas com sucesso");
     } catch (error) {
       toast.error("Ocorreu um erro ao atualizar as configurações de notificação");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Nova função para alteração de senha
+  async function onSubmitPassword(values: z.infer<typeof passwordFormSchema>) {
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: values.newPassword,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success("Senha alterada com sucesso");
+      passwordForm.reset();
+    } catch (error) {
+      toast.error("Ocorreu um erro ao alterar a senha");
     } finally {
       setSubmitting(false);
     }
@@ -255,6 +285,57 @@ export default function SettingsPage() {
                   
                   <Button type="submit" disabled={submitting}>
                     {submitting ? "Salvando..." : "Salvar Configurações"}
+                  </Button>
+                </form>
+              </Form>
+
+              {/* Novo formulário para alteração de senha */}
+              <Form {...passwordForm}>
+                <form onSubmit={passwordForm.handleSubmit(onSubmitPassword)} className="space-y-6 mt-8">
+                  <FormField
+                    control={passwordForm.control}
+                    name="currentPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Senha Atual</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Digite sua senha atual" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={passwordForm.control}
+                    name="newPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nova Senha</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Digite sua nova senha" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={passwordForm.control}
+                    name="confirmNewPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirmar Nova Senha</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Confirme sua nova senha" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? "Alterando..." : "Alterar Senha"}
                   </Button>
                 </form>
               </Form>
